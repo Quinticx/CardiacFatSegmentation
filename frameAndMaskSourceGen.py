@@ -6,7 +6,7 @@ import nrrd
 
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
-def writeImages(framePath, frameData, segPath, segData):
+def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel):
 
     # check to see if path exists, and if not create it
     if not os.path.exists(framePath):
@@ -29,8 +29,49 @@ def writeImages(framePath, frameData, segPath, segData):
     print(numSegSlices)
     print(numTissueTypes)
 
-    # loop through each slice and write the image file
+    # get offset value from seg nrrd
+    segOffsetString = segHeader.get('Segmentation_ReferenceImageExtentOffset')
+    segOffsetList = segOffsetString.split(' ')
+    segOffsetFrame = int(segOffsetList[2])
+    print('offset frame: %d' % segOffsetFrame)
 
+    # loop through each seg slice and write the image file
+    for ii in range(0, numSegSlices):
+
+        # compute index values to use for grabbing data from both regular image volume for frames
+        # and segmented volume for masks
+        indexMask = ii
+        indexFrame = indexMask + segOffsetFrame
+
+def getTissueChannel(segHeader, whichTissueFullName):
+
+    # loop through header information and grab out the number of the tissue type based on the string passed in
+    segExists = True
+    numSeg = 0
+
+    while segExists:
+
+        # check for the correct field name
+        fieldNameToCheckLower = 'segment%.1d_name' % numSeg
+        fieldNameToCheckCap = 'Segment%.1d_Name' % numSeg
+
+        if segHeader.get(fieldNameToCheckLower):
+            fieldNameToCheck = fieldNameToCheckLower
+        else:
+            if segHeader.get(fieldNameToCheckCap):
+                fieldNameToCheck = fieldNameToCheckCap
+            else:
+                segExists = False
+                break
+
+        # get current name
+        segName = segHeader.get(fieldNameToCheck)
+        if segName == whichTissueFullName:
+            break
+        else:
+            numSeg = numSeg + 1
+
+    return numSeg
 
 # column numbers for the filenames - 1-based indexing as in excel
 edFileNameCol = 4
@@ -39,7 +80,8 @@ esFileNameCol = 6
 esSegNameCol = 7
 
 # which tissue type for this pass?
-whichTissue = 'LM'  # left myocardium
+whichTissueFileName = 'LM'  # left myocardium
+whichTissueFullName = 'LeftMyocardium'
 
 # top level location of spreadsheet
 spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.xlsx'
@@ -71,8 +113,12 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         esSegName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[esSegNameCol].value
 
         # open each of the image NRRD files and "explode" them into separate image files
-        framePath = outputPath + '\\NumberedFrames' + whichTissue
-        segPath = outputPath + '\\NumberedMasks' + whichTissue
+        framePath = outputPath + '\\NumberedFrames' + whichTissueFileName
+        segPath = outputPath + '\\NumberedMasks' + whichTissueFileName
         frameData, frameHeader = nrrd.read(edFileName)
         segData, segHeader = nrrd.read(edSegName)
-        writeImages(framePath, frameData, segPath, segData)
+
+        # get correct tissue "channel" number for this seg file based on which tissue type
+        whichTissueChannel = getTissueChannel(segHeader, whichTissueFullName)
+
+        writeImages(framePath, frameData, segPath, segData, segHeader, whichTissueChannel)
