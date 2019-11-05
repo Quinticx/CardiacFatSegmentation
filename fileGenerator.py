@@ -1,11 +1,8 @@
 import os
 import random
-import re
 from PIL import Image
 import numpy as np
-import opencv_wrapper as cv2
 import shutil
-import matplotlib.pyplot as plt
 import scipy.ndimage as nd
 
 
@@ -78,7 +75,7 @@ def add_masks(dir_name, image, num):
     img.save(DATA_PATH + '/{}'.format(dir_name) + '/' + str(num) + '.png')
 
 
-DATA_PATH = 'C:/Users/mfulton/Documents/GitHub/unet/myData/'
+DATA_PATH = './myData/'
 FRAME_PATH = DATA_PATH + 'frames/'
 MASK_PATH = DATA_PATH + 'masks/'
 
