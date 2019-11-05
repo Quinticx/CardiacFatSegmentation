@@ -9,10 +9,25 @@ import nrrd
 def writeImages(framePath, frameData, segPath, segData):
 
     # check to see if path exists, and if not create it
+    if not os.path.exists(framePath):
+        os.mkdir(framePath)
+    if not os.path.exists(segPath):
+        os.mkdir(segPath)
+
+    # count files in each path
+    numFilesInFramePath = len([name for name in os.listdir(framePath) if os.path.isfile(name)])
+    numFilesInMaskPath = len([name for name in os.listdir(segPath) if os.path.isfile(name)])
+    print(numFilesInFramePath)
+    print(numFilesInMaskPath)
 
     # determine number of slices
     numSlices = frameData.shape[2]
     print(numSlices)
+
+    numSegSlices = segData.shape[3]
+    numTissueTypes = segData.shape[0]
+    print(numSegSlices)
+    print(numTissueTypes)
 
     # loop through each slice and write the image file
 
