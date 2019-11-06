@@ -1,9 +1,10 @@
 import os
 import openpyxl
 import numpy as np
+import math
 import nrrd
 import imageio
-import cv2 as cv
+import matplotlib.pyplot as plt
 
 
 # take the seg.nrrd input image and pad it based on the extents read from the file for this tissue type
@@ -149,10 +150,13 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
         if maxSegVal < 10:
             continue
 
-        # now pad the image based on the extents
-        # padX, padY = int(extents[0]), int(extents[2])
-        padX_left, padY_top = 70, 0  # test shift of image
-        padX_right, padY_bottom = 0, 70
+        # now pad the image to make the seg the same size as the original iamge
+        sizeImY, sizeImX = imageFrame.shape
+        sizeSegY, sizeSegX = segFrame.shape
+        offsetX = sizeImX - sizeSegX
+        offsetY = sizeImY - sizeSegY
+        padX_left, padY_top = int(math.ceil(offsetX/2)), 0  # put offset on bottom left
+        padX_right, padY_bottom = 0, int(math.ceil(offsetY/2))
         newSegFrame = padSegImage(segFrame, padX_left, padY_top, padX_right, padY_bottom)
 
         # setup filenames based on how many images are already in the directory
@@ -160,13 +164,11 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
         segOutNameFullPath = segPath + '\\' + imageOutName
         imageOutNameFullPath = framePath + '\\' + imageOutName
 
-        # if debugImages:
-        #     alpha = 0.5
-        #     beta = (1.0 - alpha)
-        #     dst = cv.addWeighted(imageFrame, alpha, segFrame, beta, 0.0)
-        #     cv.imshow('dst', dst)
-        #     cv.waitKey(0)
-        #     cv.destroyAllWindows()
+        if debugImages:
+            plt.figure()
+            plt.imshow(imageFrame, 'gray', interpolation='none')
+            plt.imshow(newSegFrame, 'gray', interpolation='none', alpha=0.3)
+            plt.show()
 
         # write out the images
         imageio.imwrite(segOutNameFullPath, newSegFrame)
