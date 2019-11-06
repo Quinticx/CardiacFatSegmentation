@@ -2,7 +2,7 @@ import os
 import openpyxl
 import numpy as np
 import nrrd
-
+import imageio
 
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
@@ -15,10 +15,15 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
         os.mkdir(segPath)
 
     # count files in each path
-    numFilesInFramePath = len([name for name in os.listdir(framePath) if os.path.isfile(name)])
-    numFilesInMaskPath = len([name for name in os.listdir(segPath) if os.path.isfile(name)])
+    namesFramePath = os.listdir(framePath)
+    numFilesInFramePath = len(namesFramePath)
+    # numFilesInFramePath = len([name for name in os.listdir(framePath) if os.path.isfile(name)])
+    namesMaskPath = os.listdir(segPath)
+    numFilesInMaskPath = len(namesMaskPath)
+    # numFilesInMaskPath = len([name for name in os.listdir(segPath) if os.path.isfile(name)])
     print(numFilesInFramePath)
     print(numFilesInMaskPath)
+    startFileNum = numFilesInMaskPath
 
     # determine number of slices
     numSlices = frameData.shape[2]
@@ -32,8 +37,8 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
     # get offset value from seg nrrd
     segOffsetString = segHeader.get('Segmentation_ReferenceImageExtentOffset')
     segOffsetList = segOffsetString.split(' ')
-    segOffsetFrame = int(segOffsetList[2])
-    print('offset frame: %d' % segOffsetFrame)
+    segOffsetFrameIndex = int(segOffsetList[2])
+    print('offset frame: %d' % segOffsetFrameIndex)
 
     # loop through each seg slice and write the image file
     for ii in range(0, numSegSlices):
@@ -41,8 +46,25 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
         # compute index values to use for grabbing data from both regular image volume for frames
         # and segmented volume for masks
         indexMask = ii
-        indexFrame = indexMask + segOffsetFrame
+        indexFrame = indexMask + segOffsetFrameIndex
 
+        # extract out the image data for each slice to write to file
+        # imageFrame = frameData[:, :, ii].astype(np.uint8)
+        imageFrame = frameData[:, :, ii]
+        segFrame = (segData[tissueChannel, :, :, ii] * 255).astype(np.uint8)  # scale to 0-255
+
+        # setup filenames based on how many images are already in the directory
+        imageOutName = '%.3d.png' % (startFileNum + ii)
+        segOutNameFullPath = segPath + '\\' + imageOutName
+        imageOutNameFullPath = framePath + '\\' + imageOutName
+
+        # write out the images
+        imageio.imwrite(segOutNameFullPath, segFrame)
+        imageio.imwrite(imageOutNameFullPath, imageFrame)
+
+
+# parses each channel in seg.nrrd and returns the zero-based number of the channel based on matching
+# the name string
 def getTissueChannel(segHeader, whichTissueFullName):
 
     # loop through header information and grab out the number of the tissue type based on the string passed in
@@ -72,6 +94,7 @@ def getTissueChannel(segHeader, whichTissueFullName):
             numSeg = numSeg + 1
 
     return numSeg
+
 
 # column numbers for the filenames - 1-based indexing as in excel
 edFileNameCol = 4
