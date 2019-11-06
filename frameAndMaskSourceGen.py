@@ -3,10 +3,11 @@ import openpyxl
 import numpy as np
 import nrrd
 import imageio
+import cv2 as cv
 
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
-def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel):
+def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel, debugImages):
 
     # check to see if path exists, and if not create it
     if not os.path.exists(framePath):
@@ -14,16 +15,14 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
     if not os.path.exists(segPath):
         os.mkdir(segPath)
 
-    # TODO skip this set if the image is not cropped - just do simple check on size (maybe around 150?)
-    # TODO skip this set if all the image slice data is black - check max value below a certain point
+    # skip this set if the image is not cropped - just do simple check on size (maybe around 150?)
+    maxImageDim = max(frameData.shape)
+    if maxImageDim > 150:
+        return
 
     # count files in each path
-    namesFramePath = os.listdir(framePath)
-    numFilesInFramePath = len(namesFramePath)
-    # numFilesInFramePath = len([name for name in os.listdir(framePath) if os.path.isfile(name)])
-    namesMaskPath = os.listdir(segPath)
-    numFilesInMaskPath = len(namesMaskPath)
-    # numFilesInMaskPath = len([name for name in os.listdir(segPath) if os.path.isfile(name)])
+    numFilesInFramePath = len(os.listdir(framePath))
+    numFilesInMaskPath = len(os.listdir(segPath))
     print(numFilesInFramePath)
     print(numFilesInMaskPath)
     startFileNum = numFilesInMaskPath
@@ -44,6 +43,7 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
     print('offset frame: %d' % segOffsetFrameIndex)
 
     # loop through each seg slice and write the image file
+    imagesWritten = 0
     for ii in range(0, numSegSlices):
 
         # compute index values to use for grabbing data from both regular image volume for frames
@@ -53,17 +53,37 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
 
         # extract out the image data for each slice to write to file
         # imageFrame = frameData[:, :, ii].astype(np.uint8)
-        imageFrame = frameData[:, :, ii]
-        segFrame = (segData[tissueChannel, :, :, ii] * 255).astype(np.uint8)  # scale to 0-255
+        imageFrame = np.rot90(frameData[:, :, indexFrame])
+
+        # skip this image if all the image slice data is black - check max value below a certain point
+        maxImageVal = np.max(imageFrame)
+        if maxImageVal < 10:
+            continue
+
+        segFrame = (segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8)  # scale to 0-255
+
+        # check seg frame data also, if nothing present, skip this one
+        maxSegVal = np.max(segFrame)
+        if maxSegVal < 10:
+            continue
 
         # setup filenames based on how many images are already in the directory
-        imageOutName = '%.3d.png' % (startFileNum + ii)
+        imageOutName = '%.3d.png' % (startFileNum + imagesWritten)
         segOutNameFullPath = segPath + '\\' + imageOutName
         imageOutNameFullPath = framePath + '\\' + imageOutName
+
+        # if debugImages:
+        #     alpha = 0.5
+        #     beta = (1.0 - alpha)
+        #     dst = cv.addWeighted(imageFrame, alpha, segFrame, beta, 0.0)
+        #     cv.imshow('dst', dst)
+        #     cv.waitKey(0)
+        #     cv.destroyAllWindows()
 
         # write out the images
         imageio.imwrite(segOutNameFullPath, segFrame)
         imageio.imwrite(imageOutNameFullPath, imageFrame)
+        imagesWritten = imagesWritten + 1
 
 
 # parses each channel in seg.nrrd and returns the zero-based number of the channel based on matching
@@ -144,7 +164,10 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         frameData, frameHeader = nrrd.read(edFileName)
         segData, segHeader = nrrd.read(edSegName)
 
-        # get correct tissue "channel" number for this seg file based on which tissue type
-        whichTissueChannel = getTissueChannel(segHeader, whichTissueFullName)
+        # temp debug for only MF03PRE
+        if subjectID == 'MF0303' and prePostString == 'PRE':
 
-        writeImages(framePath, frameData, segPath, segData, segHeader, whichTissueChannel)
+            # get correct tissue "channel" number for this seg file based on which tissue type
+            whichTissueChannel = getTissueChannel(segHeader, whichTissueFullName)
+
+            writeImages(framePath, frameData, segPath, segData, segHeader, whichTissueChannel, debugImages=True)
