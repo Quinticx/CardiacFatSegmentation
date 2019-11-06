@@ -7,21 +7,18 @@ import cv2 as cv
 
 
 # take the seg.nrrd input image and pad it based on the extents read from the file for this tissue type
-def padSegImage(inImage, padX, padY):
+def padSegImage(inImage, padXLeft, padYTop, padXRight, padYBottom):
 
     # get size of input image
     sizeInputX, sizeInputY = inImage.shape[1], inImage.shape[0]
-    newSizeX = inImage.shape[1] + padX
-    newSizeY = inImage.shape[0] + padY
+    newSizeX = inImage.shape[1] + padXLeft + padXRight
+    newSizeY = inImage.shape[0] + padYTop + padYBottom
 
-    # # create new np array for image data to return
-    # outImage = np.zeros((newSizeY, newSizeX))
+    # create new np array for image data to return
+    outImage = np.zeros((newSizeY, newSizeX))
 
     # copy of the image data to the right locations
-
-    outImage = inImage  # pass through
-
-
+    outImage[padYTop:padYTop + sizeInputY, padXLeft:padXLeft + sizeInputX] = inImage
     return outImage
 
 
@@ -31,11 +28,9 @@ def computeImageAlignment(frameHeader, segHeader):
 
     # get origin and space directions for each input header
     frameOrigin = frameHeader.get('space origin')
-    print(frameOrigin)
     frameSpaceDirections = frameHeader.get('space directions')
     print(frameSpaceDirections)
     segOrigin = segHeader.get('space origin')
-    print(segOrigin)
     segSpaceDirections = segHeader.get('space directions')
 
     # Remove the channel row from the space directions (it is all NaNs)
@@ -48,14 +43,46 @@ def computeImageAlignment(frameHeader, segHeader):
     segSpacing = np.linalg.norm(segSpaceDirections, axis=1)
     print(segSpacing)
 
-    # # Handle the space the NRRD file is in
-    # space = self.header.get('space')
-    # if space in ['right-anterior-superior', 'RAS']:
-    #     self.worldSpaceMatrix = np.diag([1, 1, 1])
-    # elif space in ['left-anterior-superior', 'LAS']:
-    #     self.worldSpaceMatrix = np.diag([-1, 1, 1])
-    # elif space in ['left-posterior-superior', 'LPS']:
-    #     self.worldSpaceMatrix = np.diag([-1, -1, 1])
+    # # get the dimensions of the seg volume and the image volume
+    # sizeSegVolumeString = segHeader.get('sizes')
+    # sizeImageVolumeString = frameHeader.get('sizes')
+    # sizeSegVolume = [int(i) for i in sizeSegVolumeString]
+    # sizeImageVolume = [int(i) for i in sizeImageVolumeString]
+    # imWidth, imHeight = sizeImageVolume[0], sizeImageVolume[1]
+    # segWidth, segHeight = sizeSegVolume[0], sizeSegVolume[1]
+    #
+    # print(imWidth, imHeight)
+    # print(segWidth, segHeight)
+
+    # # Handle the space the NRRD files are in
+    # spaceFrame = frameHeader.get('space')
+    # if spaceFrame in ['right-anterior-superior', 'RAS']:
+    #     worldSpaceMatrixImage = np.diag([1, 1, 1])
+    # elif spaceFrame in ['left-anterior-superior', 'LAS']:
+    #     worldSpaceMatrixImage = np.diag([-1, 1, 1])
+    # elif spaceFrame in ['left-posterior-superior', 'LPS']:
+    #     worldSpaceMatrixImage = np.diag([-1, -1, 1])
+    # spaceSeg = segHeader.get('space')
+    # if spaceSeg in ['right-anterior-superior', 'RAS']:
+    #     worldSpaceMatrixSeg = np.diag([1, 1, 1])
+    # elif spaceSeg in ['left-anterior-superior', 'LAS']:
+    #     worldSpaceMatrixSeg = np.diag([-1, 1, 1])
+    # elif spaceSeg in ['left-posterior-superior', 'LPS']:
+    #     worldSpaceMatrixSeg = np.diag([-1, -1, 1])
+    #
+    # # transform the origins accordingly
+    # print(frameOrigin)
+    # print(segOrigin)
+    # frameOrigin = worldSpaceMatrixImage @ frameOrigin
+    # segOrigin = worldSpaceMatrixSeg @ segOrigin
+    # print(frameOrigin)
+    # print(segOrigin)
+    #
+    # # compute location of origin of the segmentation compared to the image data - i.e. do this
+    # # by subtracting so we get the diff between seg and image data, this would be the origin
+    # # of the segmentation in the 3D coordinate system of the image volume
+    # originDiff = segOrigin - frameOrigin
+    # print(originDiff)
 
 
 
@@ -123,8 +150,10 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
             continue
 
         # now pad the image based on the extents
-        padX, padY = int(extents[0]), int(extents[2])
-        newSegFrame = padSegImage(segFrame, padX, padY)
+        # padX, padY = int(extents[0]), int(extents[2])
+        padX_left, padY_top = 70, 0  # test shift of image
+        padX_right, padY_bottom = 0, 70
+        newSegFrame = padSegImage(segFrame, padX_left, padY_top, padX_right, padY_bottom)
 
         # setup filenames based on how many images are already in the directory
         imageOutName = '%.3d.png' % (startFileNum + imagesWritten)
@@ -230,8 +259,8 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         # temp debug for only MF03PRE
         if subjectID == 'MF0303' and prePostString == 'PRE':
 
-            # compute the alignment based on image and seg header
-            computeImageAlignment(frameHeader, segHeader)
+            # # compute the alignment based on image and seg header
+            # computeImageAlignment(frameHeader, segHeader)
 
             # get correct tissue "channel" number for this seg file based on which tissue type
             whichTissueChannel, extents = getTissueChannelAndExtents(segHeader, whichTissueFullName)
