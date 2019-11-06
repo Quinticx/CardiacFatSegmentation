@@ -14,6 +14,9 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
     if not os.path.exists(segPath):
         os.mkdir(segPath)
 
+    # TODO skip this set if the image is not cropped - just do simple check on size (maybe around 150?)
+    # TODO skip this set if all the image slice data is black - check max value below a certain point
+
     # count files in each path
     namesFramePath = os.listdir(framePath)
     numFilesInFramePath = len(namesFramePath)
