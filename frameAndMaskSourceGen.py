@@ -4,22 +4,61 @@ import numpy as np
 import math
 import nrrd
 import imageio
-import matplotlib.pyplot as plt
+import cv2
+
+
+def offsetSegImageInOriginal(segImage, newWidth, newHeight, xOffset, yOffset):
+
+    # get size of input image
+    segImageSizeX, segImageSizeY = segImage.shape[1], segImage.shape[0]
+
+    # create new np array for image data to return
+    outImage = np.zeros((newHeight, newWidth))
+
+    # # copy of the image data to the right locations
+    # outImage[yOffset:yOffset + segImageSizeY, xOffset:xOffset + segImageSizeX] = segImage
+
+    # copy data with for loops initially because that will be easier
+    # TODO replace with python slicing approach
+    for ii in range(0, segImageSizeY):
+
+        # compute new location of this data from source image
+        # if it's negative or past the height of the destination, just skip because this row is out of bounds
+        newRow = ii + yOffset
+        if (newRow < 0) or (newRow >= newHeight):
+            continue
+
+        for jj in range(0, segImageSizeX):
+
+            # compute new column location from source image
+            # if it's negative or past the width, skip because out of bounds
+            newCol = jj + xOffset
+            if (newCol < 0) or (newCol >= newWidth):
+                continue
+
+            # if we've made it to here, copy the value over
+            outImage[ii, jj] = segImage[newRow, newCol]
+
+    # return the output image
+    return outImage
 
 
 # take the seg.nrrd input image and pad it based on the extents read from the file for this tissue type
-def padSegImage(inImage, padXLeft, padYTop, padXRight, padYBottom):
+def padSegImage(segImage, padXLeft, padYTop, padXRight, padYBottom):
 
     # get size of input image
-    sizeInputX, sizeInputY = inImage.shape[1], inImage.shape[0]
-    newSizeX = inImage.shape[1] + padXLeft + padXRight
-    newSizeY = inImage.shape[0] + padYTop + padYBottom
+    segImageSizeX, segImageSizeY = segImage.shape[1], segImage.shape[0]
+
+    # compute new size
+    newSizeX = segImage.shape[1] + padXLeft + padXRight
+    newSizeY = segImage.shape[0] + padYTop + padYBottom
 
     # create new np array for image data to return
     outImage = np.zeros((newSizeY, newSizeX))
 
     # copy of the image data to the right locations
-    outImage[padYTop:padYTop + sizeInputY, padXLeft:padXLeft + sizeInputX] = inImage
+    outImage[padYTop:padYTop + segImageSizeY, padXLeft:padXLeft + segImageSizeX] = segImage
+
     return outImage
 
 
@@ -86,16 +125,17 @@ def computeImageAlignment(frameHeader, segHeader):
     # print(originDiff)
 
 
-
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
-def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel, extents, debugImages):
+def writeImages(framePath, frameData, segPath, segData, segHeader, overlayPath, tissueChannel, extents, debugImages):
 
     # check to see if path exists, and if not create it
     if not os.path.exists(framePath):
         os.mkdir(framePath)
     if not os.path.exists(segPath):
         os.mkdir(segPath)
+    if not os.path.exists(overlayPath):
+        os.mkdir(overlayPath)
 
     # skip this set if the image is not cropped - just do simple check on size (maybe around 150?)
     maxImageDim = max(frameData.shape)
@@ -155,25 +195,32 @@ def writeImages(framePath, frameData, segPath, segData, segHeader, tissueChannel
         sizeSegY, sizeSegX = segFrame.shape
         offsetX = sizeImX - sizeSegX
         offsetY = sizeImY - sizeSegY
-        padX_left, padY_top = int(math.ceil(offsetX/2)), 0  # put offset on bottom left
-        padX_right, padY_bottom = 0, int(math.ceil(offsetY/2))
-        newSegFrame = padSegImage(segFrame, padX_left, padY_top, padX_right, padY_bottom)
+        # padX_left, padY_top = int(math.ceil(offsetX/2)), 0  # put offset on bottom left
+        # padX_right, padY_bottom = 0, int(math.ceil(offsetY/2))
+        padX_left, padY_top = 0, 0  # put offset on bottom left
+        padX_right, padY_bottom = 0, 0
+        #newSegFrame = padSegImage(segFrame, padX_left, padY_top, padX_right, padY_bottom, inImage=segFrame)
+        newSegFrame = offsetSegImageInOriginal(segFrame, imageFrame.shape[1], imageFrame.shape[0],
+                                               padX_left, padY_bottom)
 
         # setup filenames based on how many images are already in the directory
         imageOutName = '%.3d.png' % (startFileNum + imagesWritten)
+        overlayOutName = '%.3d_overlay.png' % (startFileNum + imagesWritten)
         segOutNameFullPath = segPath + '\\' + imageOutName
         imageOutNameFullPath = framePath + '\\' + imageOutName
-
-        if debugImages:
-            plt.figure()
-            plt.imshow(imageFrame, 'gray', interpolation='none')
-            plt.imshow(newSegFrame, 'gray', interpolation='none', alpha=0.3)
-            plt.show()
+        overlayOutNameFullPath = overlayPath + '\\' + overlayOutName
 
         # write out the images
         imageio.imwrite(segOutNameFullPath, newSegFrame)
         imageio.imwrite(imageOutNameFullPath, imageFrame)
         imagesWritten = imagesWritten + 1
+
+        # for openCV blending, read back the PNGs, blend them, and rewrite overlay
+        if debugImages:
+            background = cv2.imread(imageOutNameFullPath)
+            overlay = cv2.imread(segOutNameFullPath)
+            combinedImage = cv2.addWeighted(background, 0.7, overlay, 0.3, 0)
+            cv2.imwrite(overlayOutNameFullPath, combinedImage)
 
 
 # parses each channel in seg.nrrd and returns the zero-based number of the channel based on matching
@@ -255,17 +302,15 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         # open each of the image NRRD files and "explode" them into separate image files
         framePath = outputPath + '\\NumberedFrames' + whichTissueFileName
         segPath = outputPath + '\\NumberedMasks' + whichTissueFileName
+        overlayPath = outputPath + '\\NumberedOverlays' + whichTissueFileName
         frameData, frameHeader = nrrd.read(edFileName)
         segData, segHeader = nrrd.read(edSegName)
 
         # temp debug for only MF03PRE
         if subjectID == 'MF0303' and prePostString == 'PRE':
 
-            # # compute the alignment based on image and seg header
-            # computeImageAlignment(frameHeader, segHeader)
-
             # get correct tissue "channel" number for this seg file based on which tissue type
             whichTissueChannel, extents = getTissueChannelAndExtents(segHeader, whichTissueFullName)
 
-            writeImages(framePath, frameData, segPath, segData, segHeader, whichTissueChannel,
+            writeImages(framePath, frameData, segPath, segData, segHeader, overlayPath, whichTissueChannel,
                         extents, debugImages=True)
