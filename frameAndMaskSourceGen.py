@@ -38,14 +38,9 @@ def offsetSegImageInOriginal(segImage, newWidth, newHeight, xOffset, yOffset):
                 continue
 
             # if we've made it to here, copy the value over
-            # srcY = (segImageSizeY-1) - ii
-            # srcX = (segImageSizeX-1) - jj
             srcY = ii
             srcX = jj
-            if ii < 20 and jj < 20:
-                outImage[newY, newX] = 255
-            else:
-                outImage[newY, newX] = segImage[srcY, srcX]
+            outImage[newY, newX] = segImage[srcY, srcX]
 
     # return the output image
     return outImage
@@ -215,20 +210,39 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         esSegName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[esSegNameCol].value
 
         # open each of the image NRRD files and "explode" them into separate image files
-        framePath = outputPath + '\\NumberedFrames' + whichTissueFileName
-        segPath = outputPath + '\\NumberedMasks' + whichTissueFileName
-        overlayPath = outputPath + '\\NumberedOverlays' + whichTissueFileName
-        frameData, frameHeader = nrrd.read(edFileName)
-        segData, segHeader = nrrd.read(edSegName)
+        # end-diastole
+        edFramePath = outputPath + '\\NumberedFramesED_' + whichTissueFileName
+        edSegPath = outputPath + '\\NumberedMasksED_' + whichTissueFileName
+        edOverlayPath = outputPath + '\\NumberedOverlaysED_' + whichTissueFileName
+        edFrameData, edFrameHeader = nrrd.read(edFileName)
+        edSegData, edSegHeader = nrrd.read(edSegName)
 
-        # temp debug for only MF03PRE
-        if subjectID == 'MF0303' and prePostString == 'PRE':
+        # end-systole
+        esFramePath = outputPath + '\\NumberedFramesES_' + whichTissueFileName
+        esSegPath = outputPath + '\\NumberedMasksES_' + whichTissueFileName
+        esOverlayPath = outputPath + '\\NumberedOverlaysES_' + whichTissueFileName
+        esFrameData, esFrameHeader = nrrd.read(esFileName)
+        esSegData, esSegHeader = nrrd.read(esSegName)
 
-            # test offset values for this case
-            xOffset, yOffset = 0, 0
+        # temp debug for checking offset values
+        writeES = False
+        writeED = True
+        whichSubject = 'MF0303'
+        whichScan = 'PRE'
+        if subjectID == whichSubject and prePostString == whichScan:
 
-            # get correct tissue "channel" number for this seg file based on which tissue type
-            whichTissueChannel, extents = getTissueChannelAndExtents(segHeader, whichTissueFullName)
+            # test offset values for this case - from top/left corner origin
+            edXOffset, edYOffset = 14, 3
+            esXOffset, esYOffset = 14, 3
 
-            writeImages(framePath, frameData, segPath, segData, segHeader, overlayPath, whichTissueChannel,
-                        xOffset, yOffset, debugImages=True)
+            # write images
+            if writeED:
+                # get correct tissue "channel" number for this seg file based on which tissue type
+                edWhichTissueChannel, edExtents = getTissueChannelAndExtents(edSegHeader, whichTissueFullName)
+                writeImages(edFramePath, edFrameData, edSegPath, edSegData, edSegHeader, edOverlayPath,
+                            edWhichTissueChannel, edXOffset, edYOffset, debugImages=True)
+            if writeES:
+                # get correct tissue "channel" number for this seg file based on which tissue type
+                esWhichTissueChannel, esExtents = getTissueChannelAndExtents(esSegHeader, whichTissueFullName)
+                writeImages(esFramePath, esFrameData, esSegPath, esSegData, esSegHeader, esOverlayPath,
+                            esWhichTissueChannel, esXOffset, esYOffset, debugImages=True)
