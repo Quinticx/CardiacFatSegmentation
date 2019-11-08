@@ -204,7 +204,10 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
     writeED = False
     whichSubject = 'MF0303'
     whichScan = 'PRE'
+
+    # only proceed if it's the selected scan (use this to determine offsets)
     if subjectID == whichSubject and prePostString == whichScan:
+
         # blank pre/post string means skip this file
         if prePostString is not None:
 
@@ -228,8 +231,6 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
             esOverlayPath = outputPath + '\\NumberedOverlaysES_' + whichTissueFileName
             esFrameData, esFrameHeader = nrrd.read(esFileName)
             esSegData, esSegHeader = nrrd.read(esSegName)
-
-
 
             # test offset values for this case - from top/left corner origin
             edXOffset, edYOffset = 14, 3
