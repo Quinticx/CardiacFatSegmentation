@@ -43,9 +43,9 @@ def offsetSegImageInOriginal(segImage, newWidth, newHeight, xOffset, yOffset):
             srcY = ii
             srcX = jj
             if ii < 20 and jj < 20:
-                outImage[newX, newY] = 255
+                outImage[newY, newX] = 255
             else:
-                outImage[newX, newY] = segImage[srcY, srcX]
+                outImage[newY, newX] = segImage[srcY, srcX]
 
     # return the output image
     return outImage
