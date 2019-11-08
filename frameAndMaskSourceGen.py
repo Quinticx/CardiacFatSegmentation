@@ -225,15 +225,15 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         esSegData, esSegHeader = nrrd.read(esSegName)
 
         # temp debug for checking offset values
-        writeES = False
-        writeED = True
+        writeES = True
+        writeED = False
         whichSubject = 'MF0303'
         whichScan = 'PRE'
         if subjectID == whichSubject and prePostString == whichScan:
 
             # test offset values for this case - from top/left corner origin
             edXOffset, edYOffset = 14, 3
-            esXOffset, esYOffset = 14, 3
+            esXOffset, esYOffset = 15, 8
 
             # write images
             if writeED:
