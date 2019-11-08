@@ -181,12 +181,12 @@ whichTissueFileName = 'LM'  # left myocardium
 whichTissueFullName = 'LeftMyocardium'
 
 # top level location of spreadsheet
-spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.xlsx'
+spreadSheetName = 'D:\\BIRL\\MRI-Table.xlsx'
 
 # top level location of data
-topLevelDataPath = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\OriginalDICOM'
+topLevelDataPath = 'D:\\BIRL'
 
-outputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData'
+outputPath = 'D:\\BIRL\\CardiacFatSegmentation\\myData'
 
 # lead in the spreadsheet that has the list of names
 workbook = openpyxl.load_workbook(spreadSheetName)
@@ -199,37 +199,37 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
     # read the subject ID for this scan
     subjectID = row[0].value
     prePostString = row[3].value
+    # temp debug for checking offset values
+    writeES = True
+    writeED = False
+    whichSubject = 'MF0303'
+    whichScan = 'PRE'
+    if subjectID == whichSubject and prePostString == whichScan:
+        # blank pre/post string means skip this file
+        if prePostString is not None:
 
-    # blank pre/post string means skip this file
-    if prePostString is not None:
+            # grab the filenames for this scan
+            edFileName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[edFileNameCol].value
+            edSegName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[edSegNameCol].value
+            esFileName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[esFileNameCol].value
+            esSegName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[esSegNameCol].value
 
-        # grab the filenames for this scan
-        edFileName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[edFileNameCol].value
-        edSegName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[edSegNameCol].value
-        esFileName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[esFileNameCol].value
-        esSegName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[esSegNameCol].value
+            # open each of the image NRRD files and "explode" them into separate image files
+            # end-diastole
+            edFramePath = outputPath + '\\NumberedFramesED_' + whichTissueFileName
+            edSegPath = outputPath + '\\NumberedMasksED_' + whichTissueFileName
+            edOverlayPath = outputPath + '\\NumberedOverlaysED_' + whichTissueFileName
+            edFrameData, edFrameHeader = nrrd.read(edFileName)
+            edSegData, edSegHeader = nrrd.read(edSegName)
 
-        # open each of the image NRRD files and "explode" them into separate image files
-        # end-diastole
-        edFramePath = outputPath + '\\NumberedFramesED_' + whichTissueFileName
-        edSegPath = outputPath + '\\NumberedMasksED_' + whichTissueFileName
-        edOverlayPath = outputPath + '\\NumberedOverlaysED_' + whichTissueFileName
-        edFrameData, edFrameHeader = nrrd.read(edFileName)
-        edSegData, edSegHeader = nrrd.read(edSegName)
+            # end-systole
+            esFramePath = outputPath + '\\NumberedFramesES_' + whichTissueFileName
+            esSegPath = outputPath + '\\NumberedMasksES_' + whichTissueFileName
+            esOverlayPath = outputPath + '\\NumberedOverlaysES_' + whichTissueFileName
+            esFrameData, esFrameHeader = nrrd.read(esFileName)
+            esSegData, esSegHeader = nrrd.read(esSegName)
 
-        # end-systole
-        esFramePath = outputPath + '\\NumberedFramesES_' + whichTissueFileName
-        esSegPath = outputPath + '\\NumberedMasksES_' + whichTissueFileName
-        esOverlayPath = outputPath + '\\NumberedOverlaysES_' + whichTissueFileName
-        esFrameData, esFrameHeader = nrrd.read(esFileName)
-        esSegData, esSegHeader = nrrd.read(esSegName)
 
-        # temp debug for checking offset values
-        writeES = True
-        writeED = False
-        whichSubject = 'MF0303'
-        whichScan = 'PRE'
-        if subjectID == whichSubject and prePostString == whichScan:
 
             # test offset values for this case - from top/left corner origin
             edXOffset, edYOffset = 14, 3
