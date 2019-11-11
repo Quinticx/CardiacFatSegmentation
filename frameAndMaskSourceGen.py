@@ -2,34 +2,173 @@ import os
 import openpyxl
 import numpy as np
 import nrrd
+import imageio
+import cv2
+
+
+def offsetSegImageInOriginal(segImage, newWidth, newHeight, xOffset, yOffset):
+
+    # get size of input image
+    segImageSizeX, segImageSizeY = segImage.shape[1], segImage.shape[0]
+
+    # create new np array for image data to return
+    outImage = np.zeros((newHeight, newWidth))
+
+    # # copy of the image data to the right locations
+    # outImage[yOffset:yOffset + segImageSizeY, xOffset:xOffset + segImageSizeX] = segImage
+
+    # copy data with for loops initially because that will be easier
+    # TODO replace with python slicing approach
+    for ii in range(0, segImageSizeY):
+
+        # compute new location of this data from source image
+        # if it's negative or past the height of the destination, just skip because this row is out of bounds
+        newY = ii + yOffset
+        if (newY < 0) or (newY >= newHeight):
+            print('skipping row %d' % newY)
+            continue
+
+        for jj in range(0, segImageSizeX):
+
+            # compute new column location from source image
+            # if it's negative or past the width, skip because out of bounds
+            newX = jj + xOffset
+            if (newX < 0) or (newX >= newWidth):
+                print('skipping col %d' % newX)
+                continue
+
+            # if we've made it to here, copy the value over
+            srcY = ii
+            srcX = jj
+            outImage[newY, newX] = segImage[srcY, srcX]
+
+    # return the output image
+    return outImage
 
 
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
-def writeImages(framePath, frameData, segPath, segData):
+def writeImages(framePath, frameData, segPath, segData, segHeader,
+                overlayPath, tissueChannel, offsetX, offsetY, debugImages):
 
     # check to see if path exists, and if not create it
     if not os.path.exists(framePath):
         os.mkdir(framePath)
     if not os.path.exists(segPath):
         os.mkdir(segPath)
+    if not os.path.exists(overlayPath):
+        os.mkdir(overlayPath)
+
+    # skip this set if the image is not cropped - just do simple check on size (maybe around 150?)
+    maxImageDim = max(frameData.shape)
+    if maxImageDim > 150:
+        print('Skipping %s' % framePath)
+        return
 
     # count files in each path
-    numFilesInFramePath = len([name for name in os.listdir(framePath) if os.path.isfile(name)])
-    numFilesInMaskPath = len([name for name in os.listdir(segPath) if os.path.isfile(name)])
-    print(numFilesInFramePath)
-    print(numFilesInMaskPath)
+    numFilesInFramePath = len(os.listdir(framePath))
+    numFilesInMaskPath = len(os.listdir(segPath))
+    startFileNum = numFilesInMaskPath
 
-    # determine number of slices
+    # determine number of slices and tissue types
     numSlices = frameData.shape[2]
-    print(numSlices)
-
     numSegSlices = segData.shape[3]
     numTissueTypes = segData.shape[0]
-    print(numSegSlices)
-    print(numTissueTypes)
 
-    # loop through each slice and write the image file
+    # get offset value from seg nrrd
+    segOffsetString = segHeader.get('Segmentation_ReferenceImageExtentOffset')
+    segOffsetList = segOffsetString.split(' ')
+    segOffsetFrameIndex = int(segOffsetList[2])
+    print('offset frame: %d' % segOffsetFrameIndex)
+
+    # loop through each seg slice and write the image file
+    imagesWritten = 0
+    for ii in range(0, numSegSlices):
+
+        # compute index values to use for grabbing data from both regular image volume for frames
+        # and segmented volume for masks
+        indexMask = ii
+        indexFrame = indexMask + segOffsetFrameIndex
+
+        # extract out the image data for each slice to write to file and
+        # adjust orientation to match display in slicer (for debugging)
+        imageFrame = np.fliplr(np.rot90(frameData[:, :, indexFrame]))
+
+        # skip this image if all the image slice data is black - check max value below a certain point
+        maxImageVal = np.max(imageFrame)
+        if maxImageVal < 10:
+            print('Skipping image %d' % indexFrame)
+            continue
+
+        # scale to 0-255, convert to int, and adjust orientation
+        # segFrame = (segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8)
+        segFrame = np.flipud(np.rot90((segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8)))
+
+        # check seg frame data also, if nothing present, skip this one
+        maxSegVal = np.max(segFrame)
+        if maxSegVal < 10:
+            print('Skipping seg image %d' % indexMask)
+            continue
+
+        # now pad the image to make the seg the same size as the original iamge
+        newSegFrame = offsetSegImageInOriginal(segFrame, imageFrame.shape[1], imageFrame.shape[0],
+                                               offsetX, offsetY)
+
+        # setup filenames based on how many images are already in the directory
+        imageOutName = '%.3d.png' % (startFileNum + imagesWritten)
+        overlayOutName = '%.3d_overlay.png' % (startFileNum + imagesWritten)
+        segOutNameFullPath = segPath + '\\' + imageOutName
+        imageOutNameFullPath = framePath + '\\' + imageOutName
+        overlayOutNameFullPath = overlayPath + '\\' + overlayOutName
+
+        # write out the images
+        imageio.imwrite(segOutNameFullPath, newSegFrame)
+        imageio.imwrite(imageOutNameFullPath, imageFrame)
+        imagesWritten = imagesWritten + 1
+
+        # for openCV blending, read back the PNGs, blend them, and rewrite overlay
+        if debugImages:
+            background = cv2.imread(imageOutNameFullPath)
+            overlay = cv2.imread(segOutNameFullPath)
+            combinedImage = cv2.addWeighted(background, 0.7, overlay, 0.3, 0)
+            cv2.imwrite(overlayOutNameFullPath, combinedImage)
+
+
+# parses each channel in seg.nrrd and returns the zero-based number of the channel based on matching
+# the name string
+def getTissueChannelAndExtents(segHeader, whichTissueFullName):
+
+    # loop through header information and grab out the number of the tissue type based on the string passed in
+    segExists = True
+    numSeg = 0
+
+    while segExists:
+
+        # check for the correct field name
+        fieldNameToCheckLower = 'segment%.1d_name' % numSeg
+        fieldNameToCheckCap = 'Segment%.1d_Name' % numSeg
+
+        if segHeader.get(fieldNameToCheckLower):
+            fieldNameToCheck = fieldNameToCheckLower
+        else:
+            if segHeader.get(fieldNameToCheckCap):
+                fieldNameToCheck = fieldNameToCheckCap
+            else:
+                segExists = False
+                break
+
+        # get current name
+        segName = segHeader.get(fieldNameToCheck)
+        if segName == whichTissueFullName:
+            break
+        else:
+            numSeg = numSeg + 1
+
+    # use the resulting tissue type to grab the extents and return them
+    extentFieldName = 'Segment%.1d_Extent' % numSeg
+    extentString = segHeader.get(extentFieldName).split(' ')
+
+    return numSeg, extentString
 
 
 # column numbers for the filenames - 1-based indexing as in excel
@@ -39,7 +178,8 @@ esFileNameCol = 6
 esSegNameCol = 7
 
 # which tissue type for this pass?
-whichTissue = 'LM'  # left myocardium
+whichTissueFileName = 'LM'  # left myocardium
+whichTissueFullName = 'LeftMyocardium'
 
 # top level location of spreadsheet
 spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.xlsx'
@@ -47,7 +187,14 @@ spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.
 # top level location of data
 topLevelDataPath = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\OriginalDICOM'
 
+# output path for all the numbered image files
 outputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData'
+
+# output path for the text file with data orientation/space information
+spaceOutputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData\\spaceOrientation.txt'
+
+# open the output spacing file
+spaceFile = open(spaceOutputPath, 'w')
 
 # lead in the spreadsheet that has the list of names
 workbook = openpyxl.load_workbook(spreadSheetName)
@@ -61,18 +208,70 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
     subjectID = row[0].value
     prePostString = row[3].value
 
-    # blank pre/post string means skip this file
-    if prePostString is not None:
+    # if only writing one case
+    writeES = True
+    writeED = False
+    whichSubject = 'MF0304'
+    whichScan = 'PRE'
 
-        # grab the filenames for this scan
-        edFileName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[edFileNameCol].value
-        edSegName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[edSegNameCol].value
-        esFileName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[esFileNameCol].value
-        esSegName = topLevelDataPath + '\\' + subjectID + '_' + prePostString + '\\' + row[esSegNameCol].value
+    # turn this on if only want to handle subject listed above, if false it will do all scans
+    checkSubject = False
 
-        # open each of the image NRRD files and "explode" them into separate image files
-        framePath = outputPath + '\\NumberedFrames' + whichTissue
-        segPath = outputPath + '\\NumberedMasks' + whichTissue
-        frameData, frameHeader = nrrd.read(edFileName)
-        segData, segHeader = nrrd.read(edSegName)
-        writeImages(framePath, frameData, segPath, segData)
+    # only proceed if it's the selected scan (use this to determine offsets)
+    if (subjectID == whichSubject and prePostString == whichScan and checkSubject) or (not checkSubject):
+
+        # blank pre/post string means skip this file
+        if prePostString is not None:
+
+            # grab the filenames for this scan
+            edFileName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[edFileNameCol].value
+            edSegName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[edSegNameCol].value
+            esFileName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[esFileNameCol].value
+            esSegName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[esSegNameCol].value
+
+            # open each of the image NRRD files and "explode" them into separate image files
+            # end-diastole
+            edFramePath = outputPath + '\\NumberedFramesED_' + whichTissueFileName
+            edSegPath = outputPath + '\\NumberedMasksED_' + whichTissueFileName
+            edOverlayPath = outputPath + '\\NumberedOverlaysED_' + whichTissueFileName
+            edFrameData, edFrameHeader = nrrd.read(edFileName)
+            edSegData, edSegHeader = nrrd.read(edSegName)
+
+            # end-systole
+            esFramePath = outputPath + '\\NumberedFramesES_' + whichTissueFileName
+            esSegPath = outputPath + '\\NumberedMasksES_' + whichTissueFileName
+            esOverlayPath = outputPath + '\\NumberedOverlaysES_' + whichTissueFileName
+            esFrameData, esFrameHeader = nrrd.read(esFileName)
+            esSegData, esSegHeader = nrrd.read(esSegName)
+
+            # read the spacing information from the headers
+            edFrameSpace = edFrameHeader.get('space')
+            edSegSpace = edSegHeader.get('space')
+            esFrameSpace = edFrameHeader.get('space')
+            esSegSpace = edSegHeader.get('space')
+
+            # format text line for writing space information
+            spaceOutputString = subjectID + ', ' + prePostString +\
+                                ', ED image, ' + edFrameSpace + ', ED seg, ' + edSegSpace + '\n'
+
+            # write the output line to space text file
+            spaceFile.write(spaceOutputString)
+
+            # test offset values for this case - from top/left corner origin
+            edXOffset, edYOffset = 0, 0
+            esXOffset, esYOffset = 0, 0
+
+            # write images
+            if writeED:
+                # get correct tissue "channel" number for this seg file based on which tissue type
+                edWhichTissueChannel, edExtents = getTissueChannelAndExtents(edSegHeader, whichTissueFullName)
+                writeImages(edFramePath, edFrameData, edSegPath, edSegData, edSegHeader, edOverlayPath,
+                            edWhichTissueChannel, edXOffset, edYOffset, debugImages=True)
+            if writeES:
+                # get correct tissue "channel" number for this seg file based on which tissue type
+                esWhichTissueChannel, esExtents = getTissueChannelAndExtents(esSegHeader, whichTissueFullName)
+                writeImages(esFramePath, esFrameData, esSegPath, esSegData, esSegHeader, esOverlayPath,
+                            esWhichTissueChannel, esXOffset, esYOffset, debugImages=True)
+
+# close the spacing/orientation output text file
+spaceFile.close()
