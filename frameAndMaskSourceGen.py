@@ -101,6 +101,7 @@ def writeImages(framePath, frameData, segPath, segData, segHeader,
             continue
 
         # scale to 0-255, convert to int, and adjust orientation
+        # segFrame = (segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8)
         segFrame = np.flipud(np.rot90((segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8)))
 
         # check seg frame data also, if nothing present, skip this one
@@ -181,12 +182,12 @@ whichTissueFileName = 'LM'  # left myocardium
 whichTissueFullName = 'LeftMyocardium'
 
 # top level location of spreadsheet
-spreadSheetName = 'D:\\BIRL\\MRI-Table.xlsx'
+spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.xlsx'
 
 # top level location of data
-topLevelDataPath = 'D:\\BIRL'
+topLevelDataPath = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\OriginalDICOM'
 
-outputPath = 'D:\\BIRL\\CardiacFatSegmentation\\myData'
+outputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData'
 
 # lead in the spreadsheet that has the list of names
 workbook = openpyxl.load_workbook(spreadSheetName)
@@ -199,14 +200,18 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
     # read the subject ID for this scan
     subjectID = row[0].value
     prePostString = row[3].value
-    # temp debug for checking offset values
+
+    # if only writing one case
     writeES = True
     writeED = False
-    whichSubject = 'MF0303'
+    whichSubject = 'MF0304'
     whichScan = 'PRE'
 
+    # turn this on if only want to handle subject listed above, if false it will do all scans
+    checkSubject = False
+
     # only proceed if it's the selected scan (use this to determine offsets)
-    if subjectID == whichSubject and prePostString == whichScan:
+    if (subjectID == whichSubject and prePostString == whichScan and checkSubject) or (not checkSubject):
 
         # blank pre/post string means skip this file
         if prePostString is not None:
@@ -233,8 +238,8 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
             esSegData, esSegHeader = nrrd.read(esSegName)
 
             # test offset values for this case - from top/left corner origin
-            edXOffset, edYOffset = 14, 3
-            esXOffset, esYOffset = 15, 8
+            edXOffset, edYOffset = 0, 0
+            esXOffset, esYOffset = 0, 0
 
             # write images
             if writeED:
