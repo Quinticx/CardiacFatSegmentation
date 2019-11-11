@@ -187,7 +187,14 @@ spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.
 # top level location of data
 topLevelDataPath = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\OriginalDICOM'
 
+# output path for all the numbered image files
 outputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData'
+
+# output path for the text file with data orientation/space information
+spaceOutputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData\\spaceOrientation.txt'
+
+# open the output spacing file
+spaceFile = open(spaceOutputPath, 'w')
 
 # lead in the spreadsheet that has the list of names
 workbook = openpyxl.load_workbook(spreadSheetName)
@@ -237,6 +244,19 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
             esFrameData, esFrameHeader = nrrd.read(esFileName)
             esSegData, esSegHeader = nrrd.read(esSegName)
 
+            # read the spacing information from the headers
+            edFrameSpace = edFrameHeader.get('space')
+            edSegSpace = edSegHeader.get('space')
+            esFrameSpace = edFrameHeader.get('space')
+            esSegSpace = edSegHeader.get('space')
+
+            # format text line for writing space information
+            spaceOutputString = subjectID + ', ' + prePostString +\
+                                ', ED image, ' + edFrameSpace + ', ED seg, ' + edSegSpace + '\n'
+
+            # write the output line to space text file
+            spaceFile.write(spaceOutputString)
+
             # test offset values for this case - from top/left corner origin
             edXOffset, edYOffset = 0, 0
             esXOffset, esYOffset = 0, 0
@@ -252,3 +272,6 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
                 esWhichTissueChannel, esExtents = getTissueChannelAndExtents(esSegHeader, whichTissueFullName)
                 writeImages(esFramePath, esFrameData, esSegPath, esSegData, esSegHeader, esOverlayPath,
                             esWhichTissueChannel, esXOffset, esYOffset, debugImages=True)
+
+# close the spacing/orientation output text file
+spaceFile.close()
