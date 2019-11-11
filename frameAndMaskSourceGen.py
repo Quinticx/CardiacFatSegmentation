@@ -49,7 +49,7 @@ def offsetSegImageInOriginal(segImage, newWidth, newHeight, xOffset, yOffset):
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
 def writeImages(framePath, frameData, segPath, segData, segHeader,
-                overlayPath, tissueChannel, offsetX, offsetY, debugImages):
+                overlayPath, fileNameAppend, tissueChannel, offsetX, offsetY, debugImages):
 
     # check to see if path exists, and if not create it
     if not os.path.exists(framePath):
@@ -115,8 +115,8 @@ def writeImages(framePath, frameData, segPath, segData, segHeader,
                                                offsetX, offsetY)
 
         # setup filenames based on how many images are already in the directory
-        imageOutName = '%.3d.png' % (startFileNum + imagesWritten)
-        overlayOutName = '%.3d_overlay.png' % (startFileNum + imagesWritten)
+        imageOutName = '%.3d_%s.png' % ((startFileNum + imagesWritten), fileNameAppend)
+        overlayOutName = '%.3d_overlay_%s.png' % ((startFileNum + imagesWritten), fileNameAppend)
         segOutNameFullPath = segPath + '\\' + imageOutName
         imageOutNameFullPath = framePath + '\\' + imageOutName
         overlayOutNameFullPath = overlayPath + '\\' + overlayOutName
@@ -208,20 +208,24 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
     subjectID = row[0].value
     prePostString = row[3].value
 
-    # if only writing one case
-    writeES = True
-    writeED = False
-    whichSubject = 'MF0304'
-    whichScan = 'PRE'
+    # blank pre/post string means skip this file
+    if prePostString is not None:
 
-    # turn this on if only want to handle subject listed above, if false it will do all scans
-    checkSubject = False
+        # make the strings to append to filenames for ED and ES images
+        appendED = subjectID + '_' + prePostString + '_ED'
+        appendES = subjectID + '_' + prePostString + '_ES'
 
-    # only proceed if it's the selected scan (use this to determine offsets)
-    if (subjectID == whichSubject and prePostString == whichScan and checkSubject) or (not checkSubject):
+        # if only writing one case
+        writeES = True
+        writeED = False
+        whichSubject = 'MF0304'
+        whichScan = 'PRE'
 
-        # blank pre/post string means skip this file
-        if prePostString is not None:
+        # turn this on if only want to handle subject listed above, if false it will do all scans
+        checkSubject = False
+
+        # only proceed if it's the selected scan (use this to determine offsets)
+        if (subjectID == whichSubject and prePostString == whichScan and checkSubject) or (not checkSubject):
 
             # grab the filenames for this scan
             edFileName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[edFileNameCol].value
@@ -266,12 +270,12 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
                 # get correct tissue "channel" number for this seg file based on which tissue type
                 edWhichTissueChannel, edExtents = getTissueChannelAndExtents(edSegHeader, whichTissueFullName)
                 writeImages(edFramePath, edFrameData, edSegPath, edSegData, edSegHeader, edOverlayPath,
-                            edWhichTissueChannel, edXOffset, edYOffset, debugImages=True)
+                            appendED, edWhichTissueChannel, edXOffset, edYOffset, debugImages=True)
             if writeES:
                 # get correct tissue "channel" number for this seg file based on which tissue type
                 esWhichTissueChannel, esExtents = getTissueChannelAndExtents(esSegHeader, whichTissueFullName)
                 writeImages(esFramePath, esFrameData, esSegPath, esSegData, esSegHeader, esOverlayPath,
-                            esWhichTissueChannel, esXOffset, esYOffset, debugImages=True)
+                            appendES, esWhichTissueChannel, esXOffset, esYOffset, debugImages=True)
 
 # close the spacing/orientation output text file
 spaceFile.close()
