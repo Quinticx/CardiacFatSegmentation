@@ -202,11 +202,13 @@ worksheet = next(iter(workbook))
 
 # loop through each row and grab out the filenames that are required for both the image data (for the "frames") and
 # the segmentations (for the "masks") - min row is 2 as in excel, to start at first scan
-for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 for correct column data
+for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=18):  # min 1 max 18 for correct column data
 
-    # read the subject ID for this scan
+    # read the subject ID, prepost string, and offsets for this scan
     subjectID = row[0].value
     prePostString = row[3].value
+    edXOffset, edYOffset = row[14].value, row[15].value
+    esXOffset, esYOffset = row[16].value, row[17].value
 
     # blank pre/post string means skip this file
     if prePostString is not None:
@@ -224,8 +226,10 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
         # turn this on if only want to handle subject listed above, if false it will do all scans
         checkSubject = False
 
-        # only proceed if it's the selected scan (use this to determine offsets)
-        if (subjectID == whichSubject and prePostString == whichScan and checkSubject) or (not checkSubject):
+        # only proceed if it's the selected scan (use this to determine offsets), or if not checking subjects
+        # then proceed always unless there are no offset values in the spreadsheet (checking ed x offset)
+        if ((subjectID == whichSubject) and (prePostString == whichScan) and (checkSubject)) or \
+                ((not checkSubject) and (edXOffset is not None)):
 
             # grab the filenames for this scan
             edFileName = topLevelDataPath + '\\' + subjectID + '-' + prePostString + '\\' + row[edFileNameCol].value
@@ -262,8 +266,9 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=8):  # min 1 max 8 
             spaceFile.write(spaceOutputString)
 
             # test offset values for this case - from top/left corner origin
-            edXOffset, edYOffset = 0, 0
-            esXOffset, esYOffset = 0, 0
+            # IF FINDING OFFSET VALUES, RESET HERE FOR THIS CASE, OTHERWISE, IT WILL USE WHAT'S READ FROM SPREADSHEET
+            # edXOffset, edYOffset = 0, 0
+            # esXOffset, esYOffset = 0, 0
 
             # write images
             if writeED:
