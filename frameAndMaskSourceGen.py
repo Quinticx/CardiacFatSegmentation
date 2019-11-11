@@ -218,13 +218,15 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=18):  # min 1 max 1
         appendES = subjectID + '_' + prePostString + '_ES'
 
         # if only writing one case
-        writeES = True
-        writeED = False
+        # SWITCHES FOR ENC-DIASTOLIC AND END-SYSTOLIC IMAGES HERE
+        writeES = False
+        writeED = True
         whichSubject = 'MF0304'
-        whichScan = 'PRE'
+        whichScan = 'POST'
 
         # turn this on if only want to handle subject listed above, if false it will do all scans
-        checkSubject = False
+        # SWITCH TO USE FOR ONLY CHECKING CURRENT SCAN - FOR FINDING OFFSET VALUES
+        checkSubject = True
 
         # only proceed if it's the selected scan (use this to determine offsets), or if not checking subjects
         # then proceed always unless there are no offset values in the spreadsheet (checking ed x offset)
