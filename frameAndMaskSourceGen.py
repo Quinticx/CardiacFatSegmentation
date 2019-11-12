@@ -45,35 +45,35 @@ def offsetSegImageInOriginal(segImage, newWidth, newHeight, xOffset, yOffset):
     # return the output image
     return outImage
 
-# function to take in seg nrrd data and do two successive operations (rotate, flip, etc.) to orient
+# function to take in nrrd image data and do two successive operations (rotate, flip, etc.) to orient
 # it correctly compared to the image data - this is just determined empirically and stored in a spreadsheet
 # that is read in
-def orientSegImage(segFrame, firstSegOperation, secondSegOperation):
+def orientImage(image, firstOperation, secondOperation):
 
     # check string and perform first operation
-    if firstSegOperation == 'rot90':
-        segFrame = np.rot90(segFrame)
-    elif firstSegOperation == 'fliplr':
-        segFrame = np.fliplr(segFrame)
-    elif firstSegOperation == 'flipud':
-        segFrame = np.flipud(segFrame)
+    if firstOperation == 'rot90':
+        image = np.rot90(image)
+    elif firstOperation == 'fliplr':
+        image = np.fliplr(image)
+    elif firstOperation == 'flipud':
+        image = np.flipud(image)
 
     # check string and perform second operation
-    if secondSegOperation == 'rot90':
-        segFrame = np.rot90(segFrame)
-    elif secondSegOperation == 'fliplr':
-        segFrame = np.fliplr(segFrame)
-    elif secondSegOperation == 'flipud':
-        segFrame = np.flipud(segFrame)
+    if secondOperation == 'rot90':
+        image = np.rot90(image)
+    elif secondOperation == 'fliplr':
+        image = np.fliplr(image)
+    elif secondOperation == 'flipud':
+        image = np.flipud(image)
 
     # return data
-    return segFrame
+    return image
 
 # function to take in nrrd image and seg data and write out individual image filenames
 # - checks to see how many files are already in the folder and uses that as the starting number
 def writeImages(framePath, frameData, segPath, segData, segHeader,
-                overlayPath, fileNameAppend, tissueChannel, firstSegOperation, secondSegOperation,
-                offsetX, offsetY, debugImages):
+                overlayPath, fileNameAppend, tissueChannel, firstImageOperation, secondImageOperation,
+                firstSegOperation, secondSegOperation, offsetX, offsetY, debugImages):
 
     # check to see if path exists, and if not create it
     if not os.path.exists(framePath):
@@ -116,7 +116,7 @@ def writeImages(framePath, frameData, segPath, segData, segHeader,
 
         # extract out the image data for each slice to write to file and
         # adjust orientation to match display in slicer (for debugging)
-        imageFrame = np.fliplr(np.rot90(frameData[:, :, indexFrame]))
+        imageFrame = orientImage(frameData[:, :, indexFrame], firstImageOperation, secondImageOperation)
 
         # skip this image if all the image slice data is black - check max value below a certain point
         maxImageVal = np.max(imageFrame)
@@ -125,7 +125,7 @@ def writeImages(framePath, frameData, segPath, segData, segHeader,
             continue
 
         # scale to 0-255, convert to int, and adjust orientation using operations passed in
-        segFrame = orientSegImage((segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8),
+        segFrame = orientImage((segData[tissueChannel, :, :, indexMask] * 255).astype(np.uint8),
             firstSegOperation, secondSegOperation)
 
         # check seg frame data also, if nothing present, skip this one
@@ -226,17 +226,23 @@ worksheet = next(iter(workbook))
 
 # loop through each row and grab out the filenames that are required for both the image data (for the "frames") and
 # the segmentations (for the "masks") - min row is 2 as in excel, to start at first scan
-for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=22):  # min 1 max 18 for correct column data
+for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=26):  # min 1 max 18 for correct column data
 
     # read the subject ID, prepost string, and offsets for this scan
     subjectID = row[0].value
     prePostString = row[3].value
-    edXOffset, edYOffset = row[14].value, row[15].value
-    esXOffset, esYOffset = row[16].value, row[17].value
+    edXOffset, edYOffset = row[18].value, row[19].value
+    esXOffset, esYOffset = row[20].value, row[21].value
 
-    # read the segmentation image operations from the spreadsheet
-    firstSegOperation = row[18].value
-    secondSegOperation = row[19].value
+    # read the  image operations from the spreadsheet
+    edFirstSegOperation = row[22].value
+    edSecondSegOperation = row[23].value
+    esFirstSegOperation = row[24].value
+    esSecondSegOperation = row[25].value
+    edFirstImageOperation = row[14].value
+    edSecondImageOperation = row[15].value
+    esFirstImageOperation = row[16].value
+    esSecondImageOperation = row[17].value
 
     # blank pre/post string means skip this file
     if prePostString is not None:
@@ -246,15 +252,30 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=22):  # min 1 max 1
         appendES = subjectID + '_' + prePostString + '_ES'
 
         # if only writing one case
-        # SWITCHES FOR ENC-DIASTOLIC AND END-SYSTOLIC IMAGES HERE
-        writeES = False
+        # SWITCHES FOR END-DIASTOLIC AND END-SYSTOLIC IMAGES HERE, ALONG WITH SUBJECT AND SCAN INFO
+        writeES = True
         writeED = True
         whichSubject = 'MF0303'
         whichScan = 'PRE'
 
         # turn this on if only want to handle subject listed above, if false it will do all scans
-        # SWITCH TO USE FOR ONLY CHECKING CURRENT SCAN - FOR FINDING OFFSET VALUES
+        # SWITCH TO USE FOR ONLY CHECKING CURRENT SCAN - FOR FINDING OFFSET VALUES AND IMAGE OPERATIONS TO ALIGN
+        # IF THIS IS FALSE, EVERYTHING BELOW WITH TEST VALUES SHOULD BE COMMENTED OUT
         checkSubject = True
+
+        # test offset values for this case - from top/left corner origin
+        # IF FINDING OFFSET VALUES AND SEG IMAGE OPERATIONS, RESET HERE FOR THIS CASE, OTHERWISE, IT WILL
+        # USE WHAT'S READ FROM SPREADSHEET
+        edXOffset, edYOffset = 14, 3
+        esXOffset, esYOffset = 15, 8
+        edFirstSegOperation = 'rot90'
+        edSecondSegOperation = 'flipud'
+        edFirstImageOperation = 'rot90'
+        edSecondImageOperation = 'fliplr'
+        esFirstSegOperation = 'rot90'
+        esSecondSegOperation = 'flipud'
+        esFirstImageOperation = 'rot90'
+        esSecondImageOperation = 'fliplr'
 
         # only proceed if it's the selected scan (use this to determine offsets), or if not checking subjects
         # then proceed always unless there are no offset values in the spreadsheet (checking ed x offset)
@@ -295,29 +316,19 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=22):  # min 1 max 1
             # write the output line to space text file
             spaceFile.write(spaceOutputString)
 
-            # test offset values for this case - from top/left corner origin
-            # IF FINDING OFFSET VALUES AND SEG IMAGE OPERATIONS, RESET HERE FOR THIS CASE, OTHERWISE, IT WILL
-            # USE WHAT'S READ FROM SPREADSHEET
-            edXOffset, edYOffset = 14, 3
-            esXOffset, esYOffset = 15, 8
-            firstSegOperation = 'rot90'
-            secondSegOperation = 'flipud'
-            # firstSegOperation = None
-            # secondSegOperation = None
-
             # write images
             if writeED:
                 # get correct tissue "channel" number for this seg file based on which tissue type
                 edWhichTissueChannel, edExtents = getTissueChannelAndExtents(edSegHeader, whichTissueFullName)
                 writeImages(edFramePath, edFrameData, edSegPath, edSegData, edSegHeader, edOverlayPath,
-                            appendED, edWhichTissueChannel, firstSegOperation, secondSegOperation,
-                            edXOffset, edYOffset, debugImages=True)
+                            appendED, edWhichTissueChannel, edFirstImageOperation, edSecondImageOperation,
+                            edFirstSegOperation, edSecondSegOperation, edXOffset, edYOffset, debugImages=True)
             if writeES:
                 # get correct tissue "channel" number for this seg file based on which tissue type
                 esWhichTissueChannel, esExtents = getTissueChannelAndExtents(esSegHeader, whichTissueFullName)
                 writeImages(esFramePath, esFrameData, esSegPath, esSegData, esSegHeader, esOverlayPath,
-                            appendES, esWhichTissueChannel, firstSegOperation, secondSegOperation,
-                            esXOffset, esYOffset, debugImages=True)
+                            appendES, esWhichTissueChannel, esFirstImageOperation, esSecondImageOperation,
+                            esFirstSegOperation, esSecondSegOperation, esXOffset, esYOffset, debugImages=True)
 
 # close the spacing/orientation output text file
 spaceFile.close()
