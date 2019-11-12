@@ -255,8 +255,8 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=26):  # min 1 max 1
         # SWITCHES FOR END-DIASTOLIC AND END-SYSTOLIC IMAGES HERE, ALONG WITH SUBJECT AND SCAN INFO
         writeES = True
         writeED = True
-        whichSubject = 'MF0303'
-        whichScan = 'PRE'
+        whichSubject = 'MF0304'
+        whichScan = 'POST'
 
         # turn this on if only want to handle subject listed above, if false it will do all scans
         # SWITCH TO USE FOR ONLY CHECKING CURRENT SCAN - FOR FINDING OFFSET VALUES AND IMAGE OPERATIONS TO ALIGN
@@ -266,14 +266,14 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=26):  # min 1 max 1
         # test offset values for this case - from top/left corner origin
         # IF FINDING OFFSET VALUES AND SEG IMAGE OPERATIONS, RESET HERE FOR THIS CASE, OTHERWISE, IT WILL
         # USE WHAT'S READ FROM SPREADSHEET
-        edXOffset, edYOffset = 14, 3
-        esXOffset, esYOffset = 15, 8
+        edXOffset, edYOffset = 5, 1
+        esXOffset, esYOffset = 8, 4
         edFirstSegOperation = 'rot90'
-        edSecondSegOperation = 'flipud'
+        edSecondSegOperation = 'fliplr'
         edFirstImageOperation = 'rot90'
         edSecondImageOperation = 'fliplr'
         esFirstSegOperation = 'rot90'
-        esSecondSegOperation = 'flipud'
+        esSecondSegOperation = 'fliplr'
         esFirstImageOperation = 'rot90'
         esSecondImageOperation = 'fliplr'
 
@@ -293,6 +293,10 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=26):  # min 1 max 1
             edFramePath = outputPath + '\\NumberedFramesED_' + whichTissueFileName
             edSegPath = outputPath + '\\NumberedMasksED_' + whichTissueFileName
             edOverlayPath = outputPath + '\\NumberedOverlaysED_' + whichTissueFileName
+            if checkSubject:  # if only finding image ops and offsets, use other directory
+                edFramePath = edFramePath + '_test'
+                edSegPath = edSegPath + '_test'
+                edOverlayPath = edOverlayPath + '_test'
             edFrameData, edFrameHeader = nrrd.read(edFileName)
             edSegData, edSegHeader = nrrd.read(edSegName)
 
@@ -300,6 +304,10 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=26):  # min 1 max 1
             esFramePath = outputPath + '\\NumberedFramesES_' + whichTissueFileName
             esSegPath = outputPath + '\\NumberedMasksES_' + whichTissueFileName
             esOverlayPath = outputPath + '\\NumberedOverlaysES_' + whichTissueFileName
+            if checkSubject:  # if only finding image ops and offsets, use other directory
+                esFramePath = esFramePath + '_test'
+                esSegPath = esSegPath + '_test'
+                esOverlayPath = esOverlayPath + '_test'
             esFrameData, esFrameHeader = nrrd.read(esFileName)
             esSegData, esSegHeader = nrrd.read(esSegName)
 
