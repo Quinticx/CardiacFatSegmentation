@@ -75,12 +75,16 @@ def add_masks(dir_name, image, num):
     img.save(DATA_PATH + '/{}'.format(dir_name) + '/' + str(num) + '.png')
 
 
+# top level path for all data
 DATA_PATH = './myData/'
-FRAME_PATH = DATA_PATH + 'frames/'
-MASK_PATH = DATA_PATH + 'masks/'
 
-FRAME_UNIQUE_PATH = DATA_PATH + 'uniqueFrame/'
-MASK_UNIQUE_PATH = DATA_PATH + 'uniqueMask/'
+# specific path underneath top level for pointing to frames and masks for training
+# change this to the tissue type selected based on the "suffix" on the folder
+FRAME_PATH = DATA_PATH + 'NumberedFramesED_LM/'
+MASK_PATH = DATA_PATH + 'NumberedMasksED_LM/'
+
+# FRAME_UNIQUE_PATH = DATA_PATH + 'uniqueFrame/'
+# MASK_UNIQUE_PATH = DATA_PATH + 'uniqueMask/'
 
 FRAME_BLANK_PATH = DATA_PATH + 'NumberedFrames/'
 MASK_BLANK_PATH = DATA_PATH + 'NumberedMasks/'
@@ -107,12 +111,12 @@ train_split = int(0.7 * len(all_frames))
 val_split = int(0.9 * len(all_frames))
 
 train_frames = all_frames[:train_split]
-val_frames = all_frames[train_split:val_split]
-test_frames = all_frames[val_split:]
+val_frames = all_frames[train_split:val_split]  # not sure what validation frames are for at this point, split train/test
+test_frames = all_frames[train_split:]
 
 train_masks = all_masks[:train_split]
 val_masks = all_masks[train_split:val_split]
-test_masks = all_masks[val_split:]
+test_masks = all_masks[train_split:]
 
 folders1 = ['Original/', 'Sobel/', 'Laplacian/']
 folders2 = ['Test/', 'Val/', 'Train/']
