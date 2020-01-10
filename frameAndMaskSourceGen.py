@@ -206,16 +206,16 @@ whichTissueFileName = 'LM'  # left myocardium
 whichTissueFullName = 'LeftMyocardium'
 
 # top level location of spreadsheet
-spreadSheetName = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\MRI-Table.xlsx'
+spreadSheetName = 'C:\\Users\\vdinh\\Documents\\MF03_WashU_CCIR_MRIData\\MRI-Table.xlsx'
 
 # top level location of data
-topLevelDataPath = 'C:\\Users\\jokling\\Documents\\WashU_CCIR_MRIData\\OriginalDICOM'
+topLevelDataPath = 'C:\\Users\\vdinh\\Documents\\MF03_WashU_CCIR_MRIData'
 
 # output path for all the numbered image files
-outputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData'
+outputPath = 'C:\\Users\\vdinh\\Desktop\\CardiacFatSegmentation\\myData'
 
 # output path for the text file with data orientation/space information
-spaceOutputPath = 'C:\\Users\\jokling\\Documents\\Projects\\CardiacFatSegmentation\\myData\\spaceOrientation.txt'
+spaceOutputPath = 'C:\\Users\\vdinh\\Desktop\\CardiacFatSegmentation\\myData\\spaceOrientation.txt'
 
 # open the output spacing file
 spaceFile = open(spaceOutputPath, 'w')
@@ -255,27 +255,27 @@ for row in worksheet.iter_rows(min_row=2, min_col=1, max_col=26):  # min 1 max 1
         # SWITCHES FOR END-DIASTOLIC AND END-SYSTOLIC IMAGES HERE, ALONG WITH SUBJECT AND SCAN INFO
         writeES = True
         writeED = True
-        whichSubject = 'MF0304'
+        whichSubject = 'MF0312'
         whichScan = 'POST'
 
         # turn this on if only want to handle subject listed above, if false it will do all scans
         # SWITCH TO USE FOR ONLY CHECKING CURRENT SCAN - FOR FINDING OFFSET VALUES AND IMAGE OPERATIONS TO ALIGN
         # IF THIS IS FALSE, EVERYTHING BELOW WITH TEST VALUES SHOULD BE COMMENTED OUT
-        checkSubject = True
+        checkSubject = False
 
         # test offset values for this case - from top/left corner origin
         # IF FINDING OFFSET VALUES AND SEG IMAGE OPERATIONS, RESET HERE FOR THIS CASE, OTHERWISE, IT WILL
         # USE WHAT'S READ FROM SPREADSHEET
-        edXOffset, edYOffset = 5, 1
-        esXOffset, esYOffset = 8, 4
-        edFirstSegOperation = 'rot90'
-        edSecondSegOperation = 'fliplr'
-        edFirstImageOperation = 'rot90'
-        edSecondImageOperation = 'fliplr'
-        esFirstSegOperation = 'rot90'
-        esSecondSegOperation = 'fliplr'
-        esFirstImageOperation = 'rot90'
-        esSecondImageOperation = 'fliplr'
+        # edXOffset, edYOffset = 4, 8
+        # esXOffset, esYOffset = 8, 9
+        # edFirstSegOperation = 'rot90'
+        # edSecondSegOperation = 'fliplr'
+        # edFirstImageOperation = 'rot90'
+        # edSecondImageOperation = 'fliplr'
+        # esFirstSegOperation = 'rot90'
+        # esSecondSegOperation = 'fliplr'
+        # esFirstImageOperation = 'rot90'
+        # esSecondImageOperation = 'fliplr'
 
         # only proceed if it's the selected scan (use this to determine offsets), or if not checking subjects
         # then proceed always unless there are no offset values in the spreadsheet (checking ed x offset)
